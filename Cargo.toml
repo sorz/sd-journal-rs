@@ -1,0 +1,11 @@
+[package]
+name = "sd-journal"
+version = "0.1.0"
+authors = ["sorz <me@sorz.org>"]
+edition = "2018"
+
+[dependencies]
+bitflags = "1.2.1"
+
+[build-dependencies]
+bindgen = "0.52"
