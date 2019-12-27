@@ -1,5 +1,6 @@
 use crate::{journal::Journal, 
     journal_sys::{
+        ENOENT,
         sd_journal_get_data,
         sd_journal_enumerate_data,
         sd_journal_restart_data,
@@ -38,12 +39,12 @@ pub struct Entry<'j> {
 }
 
 impl<'j> Entry<'j> {
-    pub fn field<S: AsRef<str>>(&mut self, name: S) -> SdResult<Field> {
+    pub fn field<S: AsRef<str>>(&mut self, name: S) -> SdResult<Option<Field>> {
         let c_name = CString::new(name.as_ref()).unwrap();
         let mut buf = 0 as *const u8;
         let mut size = 0usize;
 
-        checked_unsafe_call! {
+        let ret = unsafe {
             sd_journal_get_data(
                 self.journal.ret,
                 c_name.as_ptr(),
@@ -51,10 +52,16 @@ impl<'j> Entry<'j> {
                 &mut size,
             )
         };
-        let buf = unsafe { std::slice::from_raw_parts(buf, size) };
-        let field = Field::from_raw(buf);
-        assert_eq!(name.as_ref(), field.name);
-        Ok(field)
+        if ret >= 0 {
+            let buf = unsafe { std::slice::from_raw_parts(buf, size) };
+            let field = Field::from_raw(buf);
+            assert_eq!(name.as_ref(), field.name);
+            Ok(Some(field))
+        } else if ret == -(ENOENT as i32) {
+            Ok(None)
+        } else {
+            Err(ret)
+        }
     }
 
     pub fn fields<'e>(&'e mut self) -> Fields<'e, 'j> {
@@ -93,6 +100,20 @@ impl<'e, 'j> Iterator for Fields<'e, 'j> {
         }
     }
 }
+
+
+#[test]
+fn test_nonexist_field() {
+    use crate::flags::OpenFlags;
+    use crate::journal::Seek;
+
+    let mut journal = Journal::open(OpenFlags::empty()).unwrap();
+    journal.seek(Seek::Head).unwrap();
+    assert!(journal.next().unwrap());
+    let mut entry = journal.entry();
+    assert!(entry.field("NON_EXIST__").unwrap().is_none())
+}
+
 
 #[test]
 fn test_enumerate_fields() {

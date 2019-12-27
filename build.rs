@@ -9,6 +9,7 @@ fn main() {
         .whitelist_function("sd_id128_.*")
         .whitelist_type("SD_JOURNAL_.*")
         .whitelist_var("SD_JOURNAL_.*")
+        .whitelist_var("E[A-Z]+")
         .header("wrapper.h")
         .generate()
         .expect("Unable to generate bindings");
