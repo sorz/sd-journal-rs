@@ -6,6 +6,7 @@ fn main() {
     println!("cargo:rustc-link-lib=systemd");
     let bindings = bindgen::Builder::default()
         .whitelist_function("sd_journal_.*")
+        .whitelist_function("sd_id128_.*")
         .whitelist_type("SD_JOURNAL_.*")
         .whitelist_var("SD_JOURNAL_.*")
         .header("wrapper.h")
