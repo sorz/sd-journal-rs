@@ -1,7 +1,6 @@
 use crate::journal_sys as sys;
 use bitflags::bitflags;
 
-
 bitflags! {
     pub struct OpenFlags: u32 {
         const LOCAL_ONLY = sys::SD_JOURNAL_LOCAL_ONLY;
