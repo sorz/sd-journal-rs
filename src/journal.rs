@@ -6,6 +6,7 @@ use crate::{
         sd_journal_close,
         sd_journal_get_usage,
         sd_journal_seek_head,
+        sd_journal_seek_tail,
         sd_journal_next,
     },
 };
@@ -36,15 +37,6 @@ impl Drop for Journal {
     }
 }
 
-enum OutOfEntry {}
-enum OnEntry {}
-
-#[derive(Debug)]
-struct Pointer<'j, S> {
-    journal: &'j mut Journal,
-    state: PhantomData<S>,
-}
-
 impl Journal {
     pub fn open(flags: OpenFlags) -> SdResult<Self> {
         let mut ret = 0 as *mut SdJournal;
@@ -53,7 +45,7 @@ impl Journal {
                 (&mut ret) as *mut _ as *mut *mut SdJournal,
                 flags.into(),
             )
-        };
+        }
         Ok(Self { ret })
     }
 
@@ -68,49 +60,37 @@ impl Journal {
         Ok(bytes)
     }
 
-    pub fn seek_head(&mut self) -> SdResult<Pointer<OutOfEntry>> {
+    pub fn seek_head(&mut self) -> SdResult<()> {
         checked_unsafe_call! {
             sd_journal_seek_head(self.ret)
         }
-        Ok(Pointer {
-            journal: self,
-            state: PhantomData,
-        })
+        Ok(())
     }
-}
 
-impl<'j, S> Pointer<'j, S> {
-    fn internal_next(&mut self) -> SdResult<()> {
+    pub fn seek_tail(&mut self) -> SdResult<()> {
         checked_unsafe_call! {
-            sd_journal_next(self.journal.ret)
+            sd_journal_seek_tail(self.ret)
         }
         Ok(())
     }
-}
 
-impl<'j> Pointer<'j, OutOfEntry> {
-    pub fn next(mut self) -> SdResult<Pointer<'j, OnEntry>> {
-        self.internal_next()?;
-        Ok(Pointer {
-            journal: self.journal,
-            state: PhantomData,
-        })
+    pub fn next(&mut self) -> SdResult<bool> {
+        match unsafe { sd_journal_next(self.ret) } {
+            0 => Ok(false),
+            1 => Ok(true),
+            e => Err(e),
+        }        
     }
 }
 
-impl<'j> Pointer<'j, OnEntry> {
-    pub fn next(&mut self) -> SdResult<()> {
-        self.internal_next()
-    }
-}
 
 #[test]
 fn test_open() {
     let mut journal = Journal::open(OpenFlags::CURRENT_USER).unwrap();
     println!("usage {}", journal.usage().unwrap());
-    let pointer = journal.seek_head().unwrap();
+    journal.seek_head().unwrap();
     println!("seek head done");
-    let pointer = pointer.next().unwrap();
+    journal.next().unwrap();
     println!("next head done");
 
 }
