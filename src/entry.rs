@@ -1,4 +1,11 @@
-use crate::{journal::Journal, journal_sys::sd_journal_get_data, SdResult};
+use crate::{journal::Journal, 
+    journal_sys::{
+        sd_journal_get_data,
+        sd_journal_enumerate_data,
+        sd_journal_restart_data,
+    },
+    SdResult
+};
 use std::{
     ffi::{c_void, CString},
     fmt,
@@ -30,8 +37,8 @@ pub struct Entry<'j> {
     pub(crate) journal: &'j Journal,
 }
 
-impl Entry<'_> {
-    pub fn field<S: AsRef<str>>(&self, name: S) -> SdResult<Field> {
+impl<'j> Entry<'j> {
+    pub fn field<S: AsRef<str>>(&mut self, name: S) -> SdResult<Field> {
         let c_name = CString::new(name.as_ref()).unwrap();
         let mut buf = 0 as *const u8;
         let mut size = 0usize;
@@ -48,5 +55,55 @@ impl Entry<'_> {
         let field = Field::from_raw(buf);
         assert_eq!(name.as_ref(), field.name);
         Ok(field)
+    }
+
+    pub fn fields<'e>(&'e mut self) -> Fields<'e, 'j> {
+        Fields(self)
+    }
+}
+
+pub struct Fields<'e, 'j: 'e>(&'e Entry<'j>);
+
+impl Drop for Fields<'_, '_> {
+    fn drop(&mut self) {
+        unsafe { sd_journal_restart_data(self.0.journal.ret) }
+    }
+}
+
+impl<'e, 'j> Iterator for Fields<'e, 'j> {
+    type Item = Field<'e>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut buf = 0 as *const u8;
+        let mut size = 0usize;
+        let ret = unsafe {
+            sd_journal_enumerate_data(
+                self.0.journal.ret,
+                &mut buf as *mut _ as *mut *const c_void,
+                &mut size,
+            )
+        };
+        match ret {
+            0 => None,
+            e if e < 0 => panic!("enumerate fail: {}", e),
+            _ => {
+                let buf = unsafe { std::slice::from_raw_parts(buf, size) };
+                Some(Field::from_raw(buf))
+            }
+        }
+    }
+}
+
+#[test]
+fn test_enumerate_fields() {
+    use crate::flags::OpenFlags;
+    use crate::journal::Seek;
+
+    let mut journal = Journal::open(OpenFlags::empty()).unwrap();
+    journal.seek(Seek::Head).unwrap();
+    assert!(journal.next().unwrap());
+    let mut entry = journal.entry();
+    for field in entry.fields() {
+        println!("field {}", field);
     }
 }

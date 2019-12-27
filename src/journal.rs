@@ -111,6 +111,6 @@ fn test_open() {
     println!("seek head done");
     assert!(journal.next().unwrap());
     println!("next head done");
-    let entry = journal.entry();
+    let mut entry = journal.entry();
     println!("field {}", entry.field("MESSAGE_ID").unwrap());
 }
