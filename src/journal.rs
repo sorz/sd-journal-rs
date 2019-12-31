@@ -101,6 +101,34 @@ impl Journal {
     pub fn entry(&mut self) -> Entry {
         Entry { journal: self }
     }
+
+    pub fn next_entry(&mut self) -> Option<Entry> {
+        match self.next() {
+            Ok(true) => Some(self.entry()),
+            Ok(false) => None,
+            Err(e) => unimplemented!("error on next(): {}", e),
+        }
+    }
+
+    pub fn previous_entry(&mut self) -> Option<Entry> {
+        match self.previous() {
+            Ok(true) => Some(self.entry()),
+            Ok(false) => None,
+            Err(e) => unimplemented!("error on previous(): {}", e),
+        }
+    }
+}
+
+#[test]
+fn test_next_previous_netry() {
+    let mut journal = Journal::open(OpenFlags::empty()).unwrap();
+    let id1 = journal.next_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
+    let id2 = journal.next_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
+    let _id3 = journal.next_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
+    let id2p = journal.previous_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
+    let id1p = journal.previous_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
+    assert_eq!(id1, id1p);
+    assert_eq!(id2, id2p);
 }
 
 #[test]
