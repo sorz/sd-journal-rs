@@ -6,9 +6,13 @@ use crate::{
         sd_journal as SdJournal, sd_journal_close, sd_journal_get_usage, sd_journal_next,
         sd_journal_next_skip, sd_journal_open, sd_journal_previous, sd_journal_previous_skip,
         sd_journal_seek_head, sd_journal_seek_monotonic_usec, sd_journal_seek_realtime_usec,
-        sd_journal_seek_tail,
+        sd_journal_seek_tail, sd_journal_enumerate_fields, sd_journal_restart_fields
     },
     SdResult,
+};
+use std::{
+    ffi::CStr,
+    os::raw::c_char,
 };
 
 #[derive(Debug, Clone)]
@@ -117,6 +121,33 @@ impl Journal {
             Err(e) => unimplemented!("error on previous(): {}", e),
         }
     }
+
+    pub fn all_fields(&mut self) -> Vec<String> {
+        unsafe { sd_journal_restart_fields(self.ret) };
+        let mut fields = Vec::new();
+        let mut field_ptr = 0 as *const c_char;
+        loop {
+            match unsafe {
+                sd_journal_enumerate_fields(self.ret, &mut field_ptr)
+            } {
+                0 => break,
+                e if e < 0 => panic!("error: sd_journal_enumerate_fields() return {}", e),
+                _ => {
+                    let cstr = unsafe { CStr::from_ptr(field_ptr) };
+                    let field = cstr.to_string_lossy().into_owned();
+                    fields.push(field);
+                }
+            }
+        }
+        fields
+    }
+}
+
+#[test]
+fn test_get_all_fields() {
+    let mut journal = Journal::open(OpenFlags::empty()).unwrap();
+    let fields = journal.all_fields();
+    println!("fields: {:?}", fields);
 }
 
 #[test]

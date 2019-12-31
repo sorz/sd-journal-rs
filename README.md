@@ -24,8 +24,8 @@ Another Rust binding for `sd-journal(3)`.
   - [ ] impl `sd_journal_get_catalog[_for_message_id]`
 - [ ] Get/test cursor string for the current journal entry
   - [ ] impl `sd_journal_[get|test]_cursor`
-- [ ] Read used field names from the journal
-  - [ ] impl `sd_journal_[enumerate|restart]_fields`, `SD_JOURNAL_FOREACH_FIELD`
+- [x] Read used field names from the journal
+  - [x] impl `sd_journal_[enumerate|restart]_fields`, `SD_JOURNAL_FOREACH_FIELD`
 - [ ] Add or remove entry matches
   - [ ] impl `sd_journal_add_match`
   - [ ] and more ...
