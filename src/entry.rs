@@ -8,14 +8,15 @@ use crate::{journal::Journal,
     SdResult
 };
 use std::{
+    borrow::Cow,
     ffi::{c_void, CString},
     fmt,
 };
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Field<'e> {
-    pub name: &'e str,
-    pub data: &'e [u8],
+    pub name: Cow<'e, str>,
+    pub data: Cow<'e, [u8]>,
 }
 
 impl<'a> Field<'a> {
@@ -24,13 +25,23 @@ impl<'a> Field<'a> {
         let name = name_data.next().unwrap();
         let data = name_data.next().expect("missing field name");
         let name = std::str::from_utf8(name).expect("invalid utf-8 field name");
-        Field { name, data }
+        Field {
+            name: Cow::Borrowed(name),
+            data: Cow::Borrowed(data),
+        }
+    }
+
+    pub fn into_owned(self) -> Field<'static> {
+        Field {
+            name: Cow::Owned(self.name.into_owned()),
+            data: Cow::Owned(self.data.into_owned()),
+        }
     }
 }
 
 impl fmt::Display for Field<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}={}", self.name, String::from_utf8_lossy(self.data))
+        write!(f, "{}={}", self.name, String::from_utf8_lossy(&self.data))
     }
 }
 
