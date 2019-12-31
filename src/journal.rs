@@ -122,11 +122,11 @@ impl Journal {
 #[test]
 fn test_next_previous_netry() {
     let mut journal = Journal::open(OpenFlags::empty()).unwrap();
-    let id1 = journal.next_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
-    let id2 = journal.next_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
-    let _id3 = journal.next_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
-    let id2p = journal.previous_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
-    let id1p = journal.previous_entry().unwrap().field("MESSAGE").unwrap().unwrap().into_owned();
+    let id1 = journal.next_entry().unwrap().field("MESSAGE").unwrap().into_owned();
+    let id2 = journal.next_entry().unwrap().field("MESSAGE").unwrap().into_owned();
+    let _id3 = journal.next_entry().unwrap().field("MESSAGE").unwrap().into_owned();
+    let id2p = journal.previous_entry().unwrap().field("MESSAGE").unwrap().into_owned();
+    let id1p = journal.previous_entry().unwrap().field("MESSAGE").unwrap().into_owned();
     assert_eq!(id1, id1p);
     assert_eq!(id2, id2p);
 }
@@ -140,5 +140,5 @@ fn test_open() {
     assert!(journal.next().unwrap());
     println!("next head done");
     let mut entry = journal.entry();
-    println!("field {}", entry.field("MESSAGE_ID").unwrap().unwrap());
+    println!("field {}", entry.field("MESSAGE").unwrap());
 }

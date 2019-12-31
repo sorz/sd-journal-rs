@@ -5,41 +5,41 @@ use crate::{journal::Journal,
         sd_journal_enumerate_data,
         sd_journal_restart_data,
     },
-    SdResult
 };
 use std::{
     borrow::Cow,
+    collections::HashMap,
     ffi::{c_void, CString},
     fmt,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Field<'e> {
+pub struct FieldData<'e> {
     pub name: Cow<'e, str>,
     pub data: Cow<'e, [u8]>,
 }
 
-impl<'a> Field<'a> {
+impl<'a> FieldData<'a> {
     fn from_raw(data: &'a [u8]) -> Self {
         let mut name_data = data.splitn(2, |c| *c == b'=');
         let name = name_data.next().unwrap();
         let data = name_data.next().expect("missing field name");
         let name = std::str::from_utf8(name).expect("invalid utf-8 field name");
-        Field {
+        Self {
             name: Cow::Borrowed(name),
             data: Cow::Borrowed(data),
         }
     }
 
-    pub fn into_owned(self) -> Field<'static> {
-        Field {
+    pub fn into_owned(self) -> FieldData<'static> {
+        FieldData {
             name: Cow::Owned(self.name.into_owned()),
             data: Cow::Owned(self.data.into_owned()),
         }
     }
 }
 
-impl fmt::Display for Field<'_> {
+impl fmt::Display for FieldData<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}={}", self.name, String::from_utf8_lossy(&self.data))
     }
@@ -50,7 +50,7 @@ pub struct Entry<'j> {
 }
 
 impl<'j> Entry<'j> {
-    pub fn field<S: AsRef<str>>(&mut self, name: S) -> SdResult<Option<Field>> {
+    pub fn field<S: AsRef<str>>(&mut self, name: S) -> Option<FieldData> {
         let c_name = CString::new(name.as_ref()).unwrap();
         let mut buf = 0 as *const u8;
         let mut size = 0usize;
@@ -65,18 +65,26 @@ impl<'j> Entry<'j> {
         };
         if ret >= 0 {
             let buf = unsafe { std::slice::from_raw_parts(buf, size) };
-            let field = Field::from_raw(buf);
+            let field = FieldData::from_raw(buf);
             assert_eq!(name.as_ref(), field.name);
-            Ok(Some(field))
+            Some(field)
         } else if ret == -(ENOENT as i32) {
-            Ok(None)
+            None
         } else {
-            Err(ret)
+            panic!("error on get field data: {}", ret);
         }
     }
 
     pub fn fields<'e>(&'e mut self) -> Fields<'e, 'j> {
         Fields(self)
+    }
+
+    pub fn all_fields(&mut self) -> HashMap<String, Vec<u8>> {
+        let mut kvs = HashMap::new();
+        for field in self.fields() {
+            kvs.insert(field.name.into_owned(), field.data.into_owned());
+        }
+        kvs
     }
 }
 
@@ -89,7 +97,7 @@ impl Drop for Fields<'_, '_> {
 }
 
 impl<'e, 'j> Iterator for Fields<'e, 'j> {
-    type Item = Field<'e>;
+    type Item = FieldData<'e>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut buf = 0 as *const u8;
@@ -106,7 +114,7 @@ impl<'e, 'j> Iterator for Fields<'e, 'j> {
             e if e < 0 => panic!("enumerate fail: {}", e),
             _ => {
                 let buf = unsafe { std::slice::from_raw_parts(buf, size) };
-                Some(Field::from_raw(buf))
+                Some(FieldData::from_raw(buf))
             }
         }
     }
@@ -122,7 +130,7 @@ fn test_nonexist_field() {
     journal.seek(Seek::Head).unwrap();
     assert!(journal.next().unwrap());
     let mut entry = journal.entry();
-    assert!(entry.field("NON_EXIST__").unwrap().is_none())
+    assert!(entry.field("NON_EXIST__").is_none())
 }
 
 
